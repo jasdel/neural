@@ -1,41 +1,75 @@
 package neural
 
 import (
+	"log"
 	"math/rand"
 	"testing"
 )
 
-func TestBPInitWeights(t *testing.T) {
-	net := NewFeedForward(2, 1, []int{1}, SigmoidActivation, SumInputs)
+func TestBPComputeDeltas(t *testing.T) {
 
-	low := -0.05
-	high := 0.05
-	bp := BackPropagation{Network: net}
-	bp.InitWeights(low, high, rand.NewSource(1))
+}
 
-	for i, layer := range bp.Network.HiddenLayers {
-		for j, node := range layer.Nodes {
-			for k, weight := range node.Weights {
-				if weight < low || weight > high {
-					t.Errorf("Unexpected weight, %d,%d,%d, %f", i, j, k, weight)
-				}
-			}
+func TestBPUpdateWeights(t *testing.T) {
+
+}
+
+func TestBPLearn(t *testing.T) {
+	net := NewNetwork(3, 2, []int{2, 2, 1}, SigmoidActivation, SigmoidActivation)
+
+	samples := [][]float64{
+		[]float64{0, 2, 2}, []float64{0, 2, 3}, []float64{0, 2, 1},
+	}
+
+	targets := [][]float64{
+		[]float64{1, 2}, []float64{1, 1}, []float64{1, 3},
+	}
+
+	net.RandomizeWeights(-0.05, 0.05, rand.NewSource(1))
+	bp := NewBackPropagation(net, 0.3, 0.2)
+
+	// for i, layer := range net.Layers {
+	// 	for j, node := range layer.Nodes {
+	// 		log.Println(i, j, node.Weights)
+	// 	}
+	// }
+
+	net.Train(samples, targets, bp)
+
+	// for i, layer := range net.Layers {
+	// 	for j, node := range layer.Nodes {
+	// 		log.Println(i, j, node.Weights)
+	// 	}
+	// }
+}
+
+func BenchmarkBPTrain(b *testing.B) {
+	inputs := 5
+	outputs := 2
+	count := 2000
+	net := NewNetwork(inputs, outputs, []int{3, 4, 3}, SigmoidActivation, SigmoidActivation)
+
+	samples := make([][]float64, count)
+	for i := 0; i < len(samples); i++ {
+		samples[i] = make([]float64, inputs)
+		for j := 0; j < len(samples[i]); j++ {
+			samples[i][j] = rand.Float64()
+		}
+	}
+	targets := make([][]float64, count)
+	for i := 0; i < len(targets); i++ {
+		targets[i] = make([]float64, outputs)
+		for j := 0; j < len(targets[i]); j++ {
+			targets[i][j] = rand.Float64()
 		}
 	}
 
-	for i, node := range bp.Network.Outputs.Nodes {
-		// if node.Weights[0] != 0 {
-		// 	t.Errorf("Unexpected weight for output bias %d %f", i, node.Weights[0])
-		// }
-		// for j := 1; j < len(node.Weights); j++ {
-		// 	if node.Weights[j] != 1 {
-		// 		t.Errorf("Unexpected weight %d,%d %f", i, j, node.Weights[j])
-		// 	}
-		// }
-		for j, weight := range node.Weights {
-			if weight < low || weight > high {
-				t.Errorf("Unexpected weight, %d,%d, %f", i, j, weight)
-			}
-		}
+	net.RandomizeWeights(-0.05, 0.05, rand.NewSource(1))
+	bp := NewBackPropagation(net, 0.3, 0.2)
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		net.Train(samples, targets, bp)
 	}
 }

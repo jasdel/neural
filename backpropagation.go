@@ -1,104 +1,95 @@
 package neural
 
-import (
-	"math"
-	"math/rand"
-)
-
+// Implementation of the backpropagation algorithm to build a neural network learner
+// uses the stochastic gradient descent algorithm to adjust weights based on error.
+// Implements the Network Learner interface.
 type BackPropagation struct {
-	Network    *FeedForward
+	learnRate  float64
+	momentum   float64
+	network    *Network
+	deltas     [][]float64
 	prevDeltas [][]float64
 }
 
-// Initializes weights in the network for each layer in the network
-// Hidden layers are assigned weights randomly bound by high and low values.
-// Output node's weights are set to 1.
-func (b *BackPropagation) InitWeights(low, high float64, randSrc rand.Source) {
-	rnd := rand.New(randSrc)
+func NewBackPropagation(network *Network, learnRate, momentum float64) *BackPropagation {
+	b := &BackPropagation{
+		learnRate: learnRate,
+		momentum:  momentum,
+		network:   network,
 
-	for _, layer := range b.Network.HiddenLayers {
-		RandInitWeights(layer.Nodes, low, high, rnd)
+		// Add room for
+		deltas:     make([][]float64, len(network.Layers)),
+		prevDeltas: make([][]float64, len(network.Layers)),
 	}
-	RandInitWeights(b.Network.Outputs.Nodes, low, high, rnd)
-	// for _, node := range b.Network.Outputs.Nodes {
-	// 	// Output nodes just sum without weights
-	// 	// Bias weight w[0] is skipped since not needed.
-	// 	// for i := 1; i < len(node.Weights); i++ {
-	// 	// 	node.Weights[i] = 1
-	// 	// }
-	// }
+
+	for i, layer := range network.Layers {
+		b.prevDeltas[i] = make([]float64, len(layer.Inputs))
+		b.deltas[i] = make([]float64, len(layer.Inputs))
+
+		// if i+1 == len(network.Layers) {
+		// 	b.prevDeltas[i+1] = make([]float64, len(layer.Nodes))
+		// 	b.deltas[i+1] = make([]float64, len(layer.Nodes))
+		// }
+	}
+
+	return b
 }
 
-func (b *BackPropagation) Train(samples, targets [][]float64, learnRate, momentum float64) {
-	for d, sample := range samples {
-		outputs := b.Network.Forward(sample)
+// Provides a way to learn the neural network using the backpropagation
+// learning algorithm.
+func (b *BackPropagation) Learn(outputs, targets []float64) {
+	last := len(b.network.Layers) - 1
 
-		last := len(b.Network.HiddenLayers)
-		deltas := make([][]float64, len(b.Network.HiddenLayers)+1)
-		deltas[last] = make([]float64, len(outputs))
-
-		// Calculate the output deltas
-		for k, output := range outputs {
-			deltas[last][k] = output * (1 - output) * (targets[d][k] - output)
-		}
-		deltas[last-1] = computeDeltas(b.Network.Outputs, deltas[last])
-
-		// Calculate the hidden deltas
-		layerFwd := b.Network.Outputs
-		for h := last - 1; h >= 0; h-- {
-			layer := b.Network.HiddenLayers[h]
-			deltas[h] = hiddenBackProp(layer, layerFwd, deltas[h+1])
-			layerFwd = layer
-		}
-
-		// Update the the deltas
-		layerFwd = b.Network.Outputs
-		for h := last - 1; h >= 0; h-- {
-			layer := b.Network.HiddenLayers[h]
-			updateBackPropWeights(layer, layerFwd, deltas[h], b.prevDeltas[h+1], learnRate, momentum)
-			layerFwd = layer
-		}
-
-		b.prevDeltas = deltas
+	// Calculate the output layer's deltas
+	for k, output := range outputs {
+		// for each output k compute the delta for target t
+		// $$\delta_k \leftarrow o_k (1 - o_k) (t_k - o_k)$$
+		b.deltas[last][k] = output * (1 - output) * (targets[k] - output)
 	}
+
+	// Compute the deltas for each layer.
+	// The current layer is used to compute the deltas of the previous layer
+	// in the network.
+	for h := last - 1; h > 0; h-- {
+		// Does not need to compute last layer because the deltas would
+		// be that of the inputs not actual nodes
+		computeDeltas(b.network.Layers[h], b.deltas[h], b.deltas[h+1])
+	}
+
+	// Update the the weights for the current layer's nodes using
+	// the deltas which were computed for it.
+	for h := last - 1; h >= 0; h-- {
+		updateWeights(b.network.Layers[h], b.deltas[h+1], b.prevDeltas[h+1], b.learnRate, b.momentum)
+	}
+
+	// Swamp layers so next iteration the current layer will be the previous
+	// and the current previous can be reused.
+	b.prevDeltas, b.deltas = b.deltas, b.prevDeltas
 }
 
-// Computes the delta for the current node's weights given each input
-// and the deltas computed in the forward layer
-func computeDeltas(layer *Layer, deltasFwd []float64) []float64 {
-	deltasBck := make([]float64, len(layer.Inputs))
-
-	// For each input h compute $$o_h (1 - o_h) \sum_{k \in nodes} w_{kh} \delta_{kh}$$
-	// Used instead so we can calculate the deltas on the node with the inputs instead of
+// Computes the delta for the previous layer's node in the network given each input
+// weight. Along with the deltas computed in the current layer.
+func computeDeltas(layer *Layer, deltasPrev, deltas []float64) {
+	// For each input h compute $$o_h (1 - o_h) \sum_{k \in nodes} w_{kh} \delta_{k}$$
+	// Used instead so we can compute the deltas on the node with the inputs instead of
 	// the node the inputs were outputs of.
-	// Same as: for each node h compute $$o_h (1 - o_h) \sum_{k \in outputs} w_{kh} \delta_{kh}$$
+	// Same as: for each node h compute $$o_h (1 - o_h) \sum_{k \in outputs} w_{kh} \delta_{k}$$
 	for h, input := range layer.Inputs {
 		sum := 0.0
 		for k, node := range layer.Nodes {
-			sum += node.Weights[h] * deltasFwd[k]
+			sum += node.Weights[h] * deltas[k]
 		}
-		deltasBck[h] = input * (1 - input) * deltasBck[h]
+		deltasPrev[h] = input * (1 - input) * sum
 	}
 }
 
 // Updates the weights of each layer based on the deltas already computed.
-// For each node i update each of its weights j.
-// $$w_{ij}(n) \leftarrow w_{ij} + \eta \delta_j x_{ij} + \alpha w_{ij}(n-1)$$
-func updateBackPropWeights(layer, layerFwd *Layer, deltas, prevDeltas []float64, learnRate, momentum float64) {
-	for i, node := range layer.Nodes {
-		for j := 0; j < len(layerFwd.Nodes[i].Weights); j++ {
-			layerFwd.Nodes[i].Weights[j] += learnRate*deltas[j]*layerFwd.Nodes[i].Inputs[j] + momentum*prevDeltas[j]
-		}
-	}
-}
-
-// Initializes the weights to random values bounded by the high and low range.
-func RandInitWeights(nodes []*Node, low, high float64, rnd *rand.Rand) {
-	rng := high - low
-	for _, node := range nodes {
-		for i := 0; i < len(node.Weights); i++ {
-			// Convert [0,1) range to low,high range for weights
-			node.Weights[i] = ((rnd.Float64()) * rng) - math.Abs(low)
+func updateWeights(layer *Layer, deltas, prevDeltas []float64, learnRate, momentum float64) {
+	// For each input i update each of its weights for node j.
+	// $$w_{ij}(n) \leftarrow w_{ij} + \eta \delta_j x_{ij} + \alpha w_{ij}(n-1)$$
+	for i, input := range layer.Inputs {
+		for j, node := range layer.Nodes {
+			node.Weights[i] += learnRate*deltas[j]*input + momentum*prevDeltas[j]
 		}
 	}
 }

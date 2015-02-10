@@ -113,7 +113,6 @@ func TestPerceptronXOR(t *testing.T) {
 
 func buildPerceptron(w []float64, t float64, actFunc ActivationFunction) *Node {
 	inputs := make([]float64, len(w))
-	inputs[0] = 1
 	return &Node{
 		Inputs:     inputs,
 		Weights:    w,
