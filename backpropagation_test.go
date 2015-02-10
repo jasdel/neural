@@ -28,19 +28,19 @@ func TestBPLearn(t *testing.T) {
 	net.RandomizeWeights(-0.05, 0.05, rand.NewSource(1))
 	bp := NewBackPropagation(net, 0.3, 0.2)
 
-	// for i, layer := range net.Layers {
-	// 	for j, node := range layer.Nodes {
-	// 		log.Println(i, j, node.Weights)
-	// 	}
-	// }
+	for i, layer := range net.Layers {
+		for j, node := range layer.Nodes {
+			log.Println(i, j, node.Weights)
+		}
+	}
 
 	net.Train(samples, targets, bp)
 
-	// for i, layer := range net.Layers {
-	// 	for j, node := range layer.Nodes {
-	// 		log.Println(i, j, node.Weights)
-	// 	}
-	// }
+	for i, layer := range net.Layers {
+		for j, node := range layer.Nodes {
+			log.Println(i, j, node.Weights)
+		}
+	}
 }
 
 func BenchmarkBPTrain(b *testing.B) {

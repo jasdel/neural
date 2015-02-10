@@ -48,18 +48,16 @@ func (b *BackPropagation) Learn(outputs, targets []float64) {
 	}
 
 	// Compute the deltas for each layer.
-	// The current layer is used to compute the deltas of the previous layer
-	// in the network.
-	for h := last - 1; h > 0; h-- {
-		// Does not need to compute last layer because the deltas would
-		// be that of the inputs not actual nodes
-		computeDeltas(b.network.Layers[h], b.deltas[h], b.deltas[h+1])
+	// Calculate delta for the nodes feeding this node. No need to process
+	// the first layer in the network because the nodes feeding it are
+	// just inputs
+	for h := last; h > 0; h-- {
+		computeDeltas(b.network.Layers[h], b.deltas[h-1], b.deltas[h])
 	}
 
-	// Update the the weights for the current layer's nodes using
-	// the deltas which were computed for it.
-	for h := last - 1; h >= 0; h-- {
-		updateWeights(b.network.Layers[h], b.deltas[h+1], b.prevDeltas[h+1], b.learnRate, b.momentum)
+	// Update the layer's weights using the deltas calculated for each node
+	for h := last; h >= 0; h-- {
+		updateWeights(b.network.Layers[h], b.deltas[h], b.prevDeltas[h], b.learnRate, b.momentum)
 	}
 
 	// Swamp layers so next iteration the current layer will be the previous
