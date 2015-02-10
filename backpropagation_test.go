@@ -15,10 +15,10 @@ func TestBPUpdateWeights(t *testing.T) {
 }
 
 func TestBPLearn(t *testing.T) {
-	net := NewNetwork(3, 2, []int{2, 2, 1}, SigmoidActivation, SigmoidActivation)
+	net := NewNetwork(5, 2, []int{3, 4, 3}, SigmoidActivation, SigmoidActivation)
 
 	samples := [][]float64{
-		[]float64{0, 2, 2}, []float64{0, 2, 3}, []float64{0, 2, 1},
+		[]float64{0, 2, 2, 1, 2}, // []float64{0, 2, 3, 2, 2}, []float64{0, 2, 1, 3, 2},
 	}
 
 	targets := [][]float64{

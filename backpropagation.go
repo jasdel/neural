@@ -1,5 +1,9 @@
 package neural
 
+import (
+	"log"
+)
+
 // Implementation of the backpropagation algorithm to build a neural network learner
 // uses the stochastic gradient descent algorithm to adjust weights based on error.
 // Implements the Network Learner interface.
@@ -23,13 +27,9 @@ func NewBackPropagation(network *Network, learnRate, momentum float64) *BackProp
 	}
 
 	for i, layer := range network.Layers {
-		b.prevDeltas[i] = make([]float64, len(layer.Inputs))
-		b.deltas[i] = make([]float64, len(layer.Inputs))
-
-		// if i+1 == len(network.Layers) {
-		// 	b.prevDeltas[i+1] = make([]float64, len(layer.Nodes))
-		// 	b.deltas[i+1] = make([]float64, len(layer.Nodes))
-		// }
+		// deltas are always number of nodes + 1 for bias
+		b.prevDeltas[i] = make([]float64, len(layer.Nodes)+1)
+		b.deltas[i] = make([]float64, len(layer.Nodes)+1)
 	}
 
 	return b
@@ -68,6 +68,7 @@ func (b *BackPropagation) Learn(outputs, targets []float64) {
 // Computes the delta for the previous layer's node in the network given each input
 // weight. Along with the deltas computed in the current layer.
 func computeDeltas(layer *Layer, deltasPrev, deltas []float64) {
+	log.Println("computeDeltas")
 	// For each input h compute $$o_h (1 - o_h) \sum_{k \in nodes} w_{kh} \delta_{k}$$
 	// Used instead so we can compute the deltas on the node with the inputs instead of
 	// the node the inputs were outputs of.
@@ -77,6 +78,7 @@ func computeDeltas(layer *Layer, deltasPrev, deltas []float64) {
 		for k, node := range layer.Nodes {
 			sum += node.Weights[h] * deltas[k]
 		}
+		log.Println("computeDeltas", h, len(layer.Inputs), len(layer.Nodes), len(deltasPrev), len(deltas))
 		deltasPrev[h] = input * (1 - input) * sum
 	}
 }
@@ -85,9 +87,12 @@ func computeDeltas(layer *Layer, deltasPrev, deltas []float64) {
 func updateWeights(layer *Layer, deltas, prevDeltas []float64, learnRate, momentum float64) {
 	// For each input i update each of its weights for node j.
 	// $$w_{ij}(n) \leftarrow w_{ij} + \eta \delta_j x_{ij} + \alpha w_{ij}(n-1)$$
+	log.Println("updateWeights")
 	for i, input := range layer.Inputs {
 		for j, node := range layer.Nodes {
-			node.Weights[i] += learnRate*deltas[j]*input + momentum*prevDeltas[j]
+			delta := learnRate*deltas[j]*input + momentum*prevDeltas[j]
+			log.Println("updateWeights", i, j, len(layer.Inputs), len(layer.Nodes), len(deltas), delta)
+			node.Weights[i] += delta
 		}
 	}
 }
